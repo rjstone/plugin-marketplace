@@ -57,6 +57,11 @@ export interface PluginDef {
   category?: string;
   tags?: string[];
   source: PluginSource;
+  /**
+   * Copy into vendor/ for harnesses that can't point at other repos (Cursor).
+   * Default: true for github/git sources not excluded from Cursor.
+   */
+  vendor?: boolean;
   /** Leave the plugin out of these catalogs. */
   exclude?: Target[];
   codex?: CodexOptions;
