@@ -13,7 +13,7 @@ import { buildOutputs, checkConsistency, loadConfig, REPO_ROOT, validateConfig, 
 import { LOCK_FILE, readLock, resolveLock, serializeLock } from './lock.ts';
 import type { FetchTags } from './lock.ts';
 import { lsRemoteTags } from './lsremote.ts';
-import { gitFetchSnapshot, syncVendor } from './vendor.ts';
+import { gitFetchSnapshot, syncVendor, vendorReady } from './vendor.ts';
 import type { FetchSnapshot } from './vendor.ts';
 
 export interface UpdateOptions {
@@ -41,7 +41,7 @@ export async function runUpdate(opts: UpdateOptions): Promise<number> {
   if (!existsSync(lockFile) || (await readFile(lockFile, 'utf8')) !== lockText) await writeFile(lockFile, lockText);
 
   const vendored = await syncVendor(cfg, resolved.lock, root, opts.fetchSnapshot ?? gitFetchSnapshot);
-  for (const f of await writeOutputs(root, buildOutputs(cfg, resolved.lock))) console.log(`wrote ${f}`);
+  for (const f of await writeOutputs(root, buildOutputs(cfg, resolved.lock, await vendorReady(cfg, resolved.lock, root)))) console.log(`wrote ${f}`);
   const consistency = await checkConsistency(cfg, resolved.lock, root);
 
   const changes = [...resolved.changes, ...vendored.changes];

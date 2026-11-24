@@ -103,3 +103,63 @@ test('plugins with a null lock commit are skipped', async () => {
   const res = await syncVendor(cfg(plugin('https://x/y.git')), { plugins: { a: { url: 'u', tag: null, commit: null, override: false, error: 'e' } } }, r, async () => { throw new Error('should not fetch'); });
   assert.deepEqual(res, { changes: [], warnings: [], errors: [] });
 });
+
+// ---- final-review fixes ----
+import { symlink } from 'node:fs/promises';
+import { vendorReady } from '../scripts/vendor.ts';
+
+test('symlinked .vendor.json in a plugin repo cannot write outside vendor/', async () => {
+  const repo = await makeFixtureRepo([], CURSOR);
+  const r = await root();
+  const victim = path.join(r, 'victim.txt');
+  await writeFile(victim, 'safe\n');
+  await symlink(victim, path.join(repo.dir, '.vendor.json'));
+  await repo.addTag('v1.0.0', CURSOR);
+  await syncVendor(cfg(plugin(repo.url)), lockOf(repo.url, 'v1.0.0', repo.commits['v1.0.0']), r, gitFetchSnapshot);
+  assert.equal(await readFile(victim, 'utf8'), 'safe\n');
+  assert.equal((await readStamp(r, 'a'))?.commit, repo.commits['v1.0.0']);
+});
+
+test('a path that resolves outside the plugin repo is rejected', async () => {
+  const outside = await mkdtemp(path.join(os.tmpdir(), 'outside-'));
+  await writeFile(path.join(outside, 'creds'), 'secret\n');
+  const repo = await makeFixtureRepo([], CURSOR);
+  await symlink(outside, path.join(repo.dir, 'plugins'));
+  await repo.addTag('v1.0.0', CURSOR);
+  const r = await root();
+  const p = plugin(repo.url, { source: { type: 'git', url: repo.url, path: 'plugins' } });
+  const res = await syncVendor(cfg(p), lockOf(repo.url, 'v1.0.0', repo.commits['v1.0.0'], 'plugins'), r, gitFetchSnapshot);
+  assert.deepEqual(res.errors, ['a: path plugins resolves outside the plugin repo']);
+  assert.equal(existsSync(path.join(r, 'vendor/a')), false);
+});
+
+test('symlinks inside a plugin are not copied', async () => {
+  const repo = await makeFixtureRepo([], CURSOR);
+  await symlink('README.md', path.join(repo.dir, 'rel-link'));
+  await repo.addTag('v1.0.0', CURSOR);
+  const r = await root();
+  const res = await syncVendor(cfg(plugin(repo.url)), lockOf(repo.url, 'v1.0.0', repo.commits['v1.0.0']), r, gitFetchSnapshot);
+  assert.equal(existsSync(path.join(r, 'vendor/a/rel-link')), false);
+  assert.ok(existsSync(path.join(r, 'vendor/a/README.md')));
+  assert.deepEqual(res.warnings, ['a: skipped 1 symlink(s) (not copied into vendor/)']);
+});
+
+test('a path change at the same commit refreshes the copy', async () => {
+  const repo = await makeFixtureRepo(['v1.0.0'], { 'p1/.cursor-plugin/plugin.json': '{}\n', 'p2/.cursor-plugin/plugin.json': '{}\n', 'p2/two.txt': '2\n' });
+  const r = await root();
+  const at = (p: string) => plugin(repo.url, { source: { type: 'git', url: repo.url, path: p } });
+  await syncVendor(cfg(at('p1')), lockOf(repo.url, 'v1.0.0', repo.commits['v1.0.0'], 'p1'), r, gitFetchSnapshot);
+  const res = await syncVendor(cfg(at('p2')), lockOf(repo.url, 'v1.0.0', repo.commits['v1.0.0'], 'p2'), r, gitFetchSnapshot);
+  assert.deepEqual(res.changes, ['a: vendored v1.0.0']);
+  assert.ok(existsSync(path.join(r, 'vendor/a/two.txt')));
+  assert.equal((await readStamp(r, 'a'))?.path, 'p2');
+});
+
+test('vendorReady lists only plugins whose copy matches the lock', async () => {
+  const repo = await makeFixtureRepo(['v1.0.0'], CURSOR);
+  const r = await root();
+  const lock = lockOf(repo.url, 'v1.0.0', repo.commits['v1.0.0']);
+  assert.deepEqual([...await vendorReady(cfg(plugin(repo.url)), lock, r)], []);
+  await syncVendor(cfg(plugin(repo.url)), lock, r, gitFetchSnapshot);
+  assert.deepEqual([...await vendorReady(cfg(plugin(repo.url)), lock, r)], ['a']);
+});

@@ -14,7 +14,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { LOCK_FILE, pluginGitUrl, readLock } from './lock.ts';
 import type { LockEntry, LockFile } from './lock.ts';
-import { isVendored, readStamp, VENDOR_DIR } from './vendor.ts';
+import { isVendored, readStamp, stampMatches, VENDOR_DIR, vendorReady } from './vendor.ts';
 import type { MarketplaceConfig, PluginDef, PluginSource } from './types.ts';
 
 export const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -106,9 +106,11 @@ function claudeSource(s: PluginSource, e: LockEntry | undefined): unknown {
 function codexSource(s: PluginSource, e: LockEntry | undefined): unknown {
   if (s.type === 'local') return { source: 'local', path: rel(s.path) };
   if (s.type === 'npm') return compact({ source: 'npm', package: s.package, version: s.version, registry: s.registry });
+  // Codex documents "ref or sha"; emit only the locked sha so an entry never carries both.
   const url = pluginGitUrl({ name: '', source: s })!;
-  if (s.path) return { source: 'git-subdir', url, path: rel(s.path), ...pin(e!) };
-  return { source: 'url', url, ...pin(e!) };
+  const sha = compact({ sha: e?.commit ?? undefined });
+  if (s.path) return { source: 'git-subdir', url, path: rel(s.path), ...sha };
+  return { source: 'url', url, ...sha };
 }
 
 function piSource(p: PluginDef, e: LockEntry | undefined): string | null {
@@ -128,11 +130,20 @@ function included(p: PluginDef, t: 'claude' | 'codex' | 'cursor'): boolean {
   return !p.exclude?.includes(t);
 }
 
-/** A plugin is listable when it is not git-sourced, or its lock entry has a commit. */
+/** True when a lock entry was resolved for this exact config source (same url and path). */
+function entryMatchesSource(p: PluginDef, e: LockEntry): boolean {
+  const s = p.source as { path?: string };
+  return e.url === pluginGitUrl(p) && (e.path ?? null) === (s.path ?? null);
+}
+
+/**
+ * A plugin is listable when it is not git-sourced, or its lock entry has a commit resolved for
+ * this exact source. An entry that later failed to update stays listed at its previous release.
+ */
 function lockFor(p: PluginDef, lock: LockFile): { listable: boolean; entry?: LockEntry } {
   if (!pluginGitUrl(p)) return { listable: true };
   const entry = lock.plugins[p.name];
-  return { listable: !!entry?.commit, entry };
+  return { listable: !!entry?.commit && entryMatchesSource(p, entry), entry };
 }
 
 function header(cfg: MarketplaceConfig): Json {
@@ -143,7 +154,8 @@ function header(cfg: MarketplaceConfig): Json {
   });
 }
 
-export function buildOutputs(cfg: MarketplaceConfig, lock: LockFile): Map<string, string> {
+/** `ready`: vendored plugins whose vendor/ copy matches the lock (see vendorReady); others are left out of Cursor. */
+export function buildOutputs(cfg: MarketplaceConfig, lock: LockFile, ready: Set<string> = new Set()): Map<string, string> {
   const out = new Map<string, string>();
   const listable = cfg.plugins
     .map((p) => ({ p, ...lockFor(p, lock) }))
@@ -179,7 +191,7 @@ export function buildOutputs(cfg: MarketplaceConfig, lock: LockFile): Map<string
   out.set('.cursor-plugin/marketplace.json', json({
     ...header(cfg),
     plugins: listable
-      .filter(({ p }) => included(p, 'cursor') && (p.source.type === 'local' || isVendored(p)))
+      .filter(({ p }) => included(p, 'cursor') && (p.source.type === 'local' || (isVendored(p) && ready.has(p.name))))
       .map(({ p }) => compact({
         name: p.name,
         source: p.source.type === 'local' ? rel(p.source.path) : `./${VENDOR_DIR}/${p.name}`,
@@ -221,9 +233,12 @@ export async function checkConsistency(cfg: MarketplaceConfig, lock: LockFile, r
       warnings.push(`${p.name}: not in ${LOCK_FILE} yet (run node scripts/update.ts)`);
       continue;
     }
+    if (!entryMatchesSource(p, e)) {
+      warnings.push(`${p.name}: ${LOCK_FILE} entry does not match the config source yet (run node scripts/update.ts)`);
+      continue;
+    }
     if (isVendored(p) && e.commit) {
-      const stamp = await readStamp(root, p.name);
-      if (stamp?.commit !== e.commit) errors.push(`${p.name}: ${VENDOR_DIR}/${p.name} is missing or not at the locked commit`);
+      if (!stampMatches(await readStamp(root, p.name), e)) errors.push(`${p.name}: ${VENDOR_DIR}/${p.name} is missing or not at the locked commit`);
     }
   }
   const vendorRoot = path.join(root, VENDOR_DIR);
@@ -275,7 +290,7 @@ async function main(): Promise<void> {
   }
 
   const lock = await readLock(root);
-  const outputs = buildOutputs(cfg, lock);
+  const outputs = buildOutputs(cfg, lock, await vendorReady(cfg, lock, root));
   const consistency = await checkConsistency(cfg, lock, root);
   for (const w of consistency.warnings) console.warn(`warning: ${w}`);
 

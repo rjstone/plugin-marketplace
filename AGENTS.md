@@ -177,6 +177,13 @@ some details taken from search excerpts only.
   into `vendor/<name>/`, and the Cursor catalog lists `./vendor/<name>`.
   - A copied plugin needs `.cursor-plugin/plugin.json` or a root `plugin.json` (Agent Plugins).
     The update job warns when neither exists.
+  - Fetched plugin content is treated as untrusted:
+    - Symlinks are never copied; the update job warns about each one it skips.
+    - A `path` that resolves outside the plugin repo is rejected.
+    - Nothing fetched is ever run.
+  - A plugin is listed for Cursor only while its copy exactly matches the locked release: same
+    commit, URL and path. If a copy fails to sync, Cursor leaves that plugin out instead of
+    pointing at a missing or outdated folder.
   - Opt a plugin out with `vendor: false` or `exclude: ['cursor']`.
 
 ### Kimi Code CLI (uncertain)
@@ -351,14 +358,19 @@ How a config `source` maps into each catalog. "Lock" means that plugin's entry i
 
 | `source` in config | Claude Code | Codex | Cursor | Pi (`pi: true`) |
 |---|---|---|---|---|
-| `{type:'github', repo}` | `github` + lock `ref`/`sha` | `url` (`https://github.com/<repo>.git`) + `ref`/`sha` | `./vendor/<name>` | `git:github.com/<repo>@<tag>` |
-| `{type:'github'\|'git', …, path}` | `git-subdir` + `ref`/`sha` | `git-subdir` (`./path`) + `ref`/`sha` | `./vendor/<name>` (that subfolder only) | error: set `pi.source` |
-| `{type:'git', url}` | `url` + `ref`/`sha` | `url` + `ref`/`sha` | `./vendor/<name>` | `git:<host/path>@<tag>` |
+| `{type:'github', repo}` | `github` + lock `ref`/`sha` | `url` (`https://github.com/<repo>.git`) + `sha` | `./vendor/<name>` | `git:github.com/<repo>@<tag>` |
+| `{type:'github'\|'git', …, path}` | `git-subdir` + `ref`/`sha` | `git-subdir` (`./path`) + `sha` | `./vendor/<name>` (that subfolder only) | error: set `pi.source` |
+| `{type:'git', url}` | `url` + `ref`/`sha` | `url` + `sha` | `./vendor/<name>` | `git:<host/path>@<tag>` |
 | `{type:'npm', package}` | `npm` | `npm` | skipped (warning) | `npm:<pkg>@<version>` |
 | `{type:'local', path}` | `"./path"` | `local` | `"./path"` | error: set `pi.source` |
 
-- Catalogs carry `ref` = the release tag **and** `sha` = its locked commit. Users therefore get
-  exactly the commit the update job resolved, even if someone moves a tag upstream.
+- **Claude Code catalog:** carries `ref` = the release tag **and** `sha` = its locked commit. Claude
+  prefers `sha` when both are set.
+- **Codex catalog:** carries only `sha`, because its docs say entries use "`ref` or `sha`".
+- So users always get exactly the commit the update job resolved, even if someone moves a tag
+  upstream.
+- If a plugin's repo URL or `path` changes in the config, it's left out of the catalogs until the
+  update job resolves the new source. It's never listed with the new URL and an old commit.
 - A git plugin that isn't in the lock yet, or that failed to resolve the first time, is left out
   of every catalog until it resolves.
 - Codex `policy` defaults to `AVAILABLE` / `ON_INSTALL`, and `category` to `Productivity`.

@@ -2,12 +2,12 @@
 // folders inside this repo (Cursor). Each copy carries a .vendor.json stamp.
 
 import { execFile } from 'node:child_process';
-import { existsSync } from 'node:fs';
-import { cp, mkdtemp, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
+import { existsSync, lstatSync } from 'node:fs';
+import { cp, mkdtemp, readdir, readFile, realpath, rename, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { promisify } from 'node:util';
-import type { LockFile } from './lock.ts';
+import type { LockEntry, LockFile } from './lock.ts';
 import type { MarketplaceConfig, PluginDef } from './types.ts';
 
 const run = promisify(execFile);
@@ -25,6 +25,11 @@ export interface VendorStamp {
 export function isVendored(p: PluginDef): boolean {
   const git = p.source.type === 'github' || p.source.type === 'git';
   return git && (p.vendor ?? !p.exclude?.includes('cursor'));
+}
+
+/** True when a copy's stamp is exactly the locked release: same commit, url and path. */
+export function stampMatches(stamp: VendorStamp | null, e: LockEntry): boolean {
+  return !!stamp && stamp.commit === e.commit && stamp.url === e.url && (stamp.path ?? null) === (e.path ?? null);
 }
 
 export async function readStamp(root: string, name: string): Promise<VendorStamp | null> {
@@ -74,7 +79,7 @@ export async function syncVendor(
   for (const p of cfg.plugins.filter(isVendored)) {
     const e = lock.plugins[p.name];
     if (!e?.commit) continue;
-    if ((await readStamp(root, p.name))?.commit === e.commit) continue;
+    if (stampMatches(await readStamp(root, p.name), e)) continue;
 
     const ref = e.tag ?? e.commit;
     const tmp = await mkdtemp(path.join(os.tmpdir(), 'vendor-fetch-'));
@@ -90,10 +95,32 @@ export async function syncVendor(
         errors.push(`${p.name}: path ${e.path} not found at ${label(e.tag, e.commit)}`);
         continue;
       }
+      // Fetched content is untrusted: never follow a symlink out of the fetched repo, never copy
+      // symlinks (they could point anywhere once committed), and never write through one.
+      const realTmp = await realpath(tmp);
+      const realSrc = await realpath(src);
+      if (realSrc !== realTmp && !realSrc.startsWith(realTmp + path.sep)) {
+        errors.push(`${p.name}: path ${e.path} resolves outside the plugin repo`);
+        continue;
+      }
+      let skipped = 0;
       await rm(staging, { recursive: true, force: true });
-      await cp(src, staging, { recursive: true, filter: (f) => path.basename(f) !== '.git' });
+      await cp(realSrc, staging, {
+        recursive: true,
+        filter: (f) => {
+          if (path.basename(f) === '.git') return false;
+          if (lstatSync(f).isSymbolicLink()) {
+            skipped++;
+            return false;
+          }
+          return true;
+        },
+      });
+      if (skipped) warnings.push(`${p.name}: skipped ${skipped} symlink(s) (not copied into ${VENDOR_DIR}/)`);
       const stamp: VendorStamp = { url: e.url, ...(e.path ? { path: e.path } : {}), tag: e.tag, commit: e.commit };
-      await writeFile(path.join(staging, STAMP_FILE), `${JSON.stringify(stamp, null, 2)}\n`);
+      const stampFile = path.join(staging, STAMP_FILE);
+      await rm(stampFile, { force: true });
+      await writeFile(stampFile, `${JSON.stringify(stamp, null, 2)}\n`, { flag: 'wx' });
       const dest = path.join(vendorRoot, p.name);
       await rm(dest, { recursive: true, force: true });
       await rename(staging, dest);
@@ -117,4 +144,14 @@ export async function syncVendor(
     }
   }
   return { changes, warnings, errors };
+}
+
+/** Names of vendored plugins whose copy in vendor/ is exactly at their locked release. */
+export async function vendorReady(cfg: MarketplaceConfig, lock: LockFile, root: string): Promise<Set<string>> {
+  const ready = new Set<string>();
+  for (const p of cfg.plugins.filter(isVendored)) {
+    const e = lock.plugins[p.name];
+    if (e?.commit && stampMatches(await readStamp(root, p.name), e)) ready.add(p.name);
+  }
+  return ready;
 }
