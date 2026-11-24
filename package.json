@@ -9,6 +9,7 @@
   "scripts": {
     "build": "node scripts/build.ts",
     "check": "node scripts/build.ts --check",
-    "typecheck": "npm install --no-save --no-package-lock --silent typescript@5.9 @types/node@22 && tsc -p ."
+    "typecheck": "npm install --no-save --no-package-lock --silent typescript@5.9 @types/node@22 && tsc -p .",
+    "test": "node --test tests/*.test.ts"
   }
 }
