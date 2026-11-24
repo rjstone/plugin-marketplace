@@ -37,15 +37,22 @@ those fields.
 
 ## Layout
 
-| Path | Harness | Status |
-|---|---|---|
-| `.claude-plugin/marketplace.json` | Claude Code + the readers above | stub, `plugins: []` |
-| `.agents/plugins/marketplace.json` | OpenAI Codex | stub, `plugins: []` |
-| `.cursor-plugin/marketplace.json` | Cursor | stub, `plugins: []` |
-| `opencode/opencode.jsonc` | opencode | config snippet, not a catalog (see below) |
+**Every catalog is generated. Never edit one by hand.** Edit `marketplace.config.ts` and run the
+generator (see "Generator" below).
 
-All catalogs use the marketplace `name` **`rjstone`**, so installs read `<plugin>@rjstone`.
-If you rename it, change every catalog together.
+| Path | What it is |
+|---|---|
+| `marketplace.config.ts` | **the single source of truth**: marketplace metadata and the plugin list |
+| `scripts/build.ts`, `scripts/types.ts` | the generator and the config types |
+| `.claude-plugin/marketplace.json` | generated: Claude Code and the readers above |
+| `.agents/plugins/marketplace.json` | generated: OpenAI Codex |
+| `.cursor-plugin/marketplace.json` | generated: Cursor (only plugins in this repo) |
+| `opencode/opencode.jsonc` | generated: opencode config snippet, not a catalog (see below) |
+| `pi/packages.json` | generated: Pi `packages` snippet, not a catalog (see below) |
+| `.github/workflows/check.yml` | CI: freshness check, type check, `claude plugin validate` |
+
+The marketplace `name` is **`rjstone`**, so installs read `<plugin>@rjstone`. Change it in
+`marketplace.config.ts`.
 
 ## Harnesses with a catalog that can point at other repos
 
@@ -302,15 +309,52 @@ sources). None demonstrate the pointer-only approach.
 - [ivan-magda/claude-code-plugin-template](https://github.com/ivan-magda/claude-code-plugin-template):
   Claude only, the most-starred of these
 
+## Generator
+
+TypeScript with no dependencies. Node ≥ 22.18 runs `.ts` files directly by stripping the
+types, so no build step is needed. Keep `scripts/*.ts` to *erasable* syntax: no `enum`,
+`namespace` or parameter properties. `tsconfig.json` enforces this with `erasableSyntaxOnly`.
+
+TypeScript was chosen over Python because the harnesses that run plugin code in-process mostly
+use TS/JS: opencode, Pi, Amp, and Claude Code "mods". Hermes uses Python and Zed uses
+Rust/WASM. Most of the other harnesses are Node apps, so maintainers will already have Node.
+Most harnesses' plugins are only Markdown and JSON, plus hooks and MCP servers that run as
+separate programs.
+
+| Command | What it does |
+|---|---|
+| `node scripts/build.ts` (`npm run build`) | writes every generated file |
+| `node scripts/build.ts --check` (`npm run check`) | exits 1 if any committed file differs from what would be generated |
+| `--config <file>` / `--out <dir>` | use another config or output folder (for testing) |
+| `npm run typecheck` | `tsc` in strict mode (installs `typescript` and `@types/node` into the gitignored `node_modules`) |
+
+How a config `source` maps into each catalog:
+
+| `source` in config | Claude Code | Codex | Cursor | Pi (`pi: true`) |
+|---|---|---|---|---|
+| `{type:'github', repo}` | `github` | `url` (`https://github.com/<repo>.git`) | skipped (warning) | `git:github.com/<repo>@<ref>` |
+| `{type:'github'\|'git', …, path}` | `git-subdir` | `git-subdir` (`./path`) | skipped | error: set `pi.source` |
+| `{type:'git', url}` | `url` | `url` | skipped | `git:<host/path>@<ref>` |
+| `{type:'npm', package}` | `npm` | `npm` | skipped | `npm:<pkg>@<version>` |
+| `{type:'local', path}` | `"./path"` | `local` | `"./path"` | error: set `pi.source` |
+
+- `ref`/`sha` are passed through, and `sha` must be the full 40 characters.
+- Codex `policy` defaults to `AVAILABLE` / `ON_INSTALL`, and `category` to `Productivity`.
+  Override them with `codex: {...}`.
+- `claude: {...}` merges extra fields into the Claude entry, such as `strict: false`.
+- `exclude: ['codex']` leaves a plugin out of a catalog.
+- opencode and Pi are opt-in: set `opencode: {package}` or `pi: true | {source}`.
+- The generator rejects bad configs:
+  - non-kebab-case names
+  - duplicate names
+  - a malformed `owner/repo` or sha
+  - `..` or absolute paths
+  - missing local folders
+
 ## Adding a plugin
 
-1. In `.claude-plugin/marketplace.json`, add an entry with a `github` or `git-subdir` source,
-   pinned with `ref` or `sha`. This one entry covers every harness in the "Key finding" table.
-2. In `.agents/plugins/marketplace.json`, add an entry with a `url` or `git-subdir` source, plus
-   `policy` and `category`.
-3. Cursor: skip it unless the plugin is vendored here; see the Cursor section.
-4. opencode / Pi: if the plugin is published as an npm or pi package, add its line to the
-   snippet.
-5. Use the same plugin `name` in every catalog, matching the plugin's own manifest `name`.
-6. Run `claude plugin validate .` and check each file with `jq . <file>` (use `jq` on the
-   `.jsonc` file only after stripping its comments).
+1. Add an entry to `plugins` in `marketplace.config.ts`. Its `name` must match the plugin's own
+   manifest `name`.
+2. Run `node scripts/build.ts`, then `node scripts/build.ts --check`, then
+   `claude plugin validate .`.
+3. Commit the config and the generated files together.

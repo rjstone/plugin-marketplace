@@ -1,0 +1,14 @@
+{
+  "name": "plugin-marketplace",
+  "private": true,
+  "type": "module",
+  "description": "Generates coding-agent plugin marketplace catalogs from marketplace.config.ts",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "build": "node scripts/build.ts",
+    "check": "node scripts/build.ts --check",
+    "typecheck": "npm install --no-save --no-package-lock --silent typescript@5.9 @types/node@22 && tsc -p ."
+  }
+}

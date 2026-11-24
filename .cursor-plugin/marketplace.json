@@ -1,8 +1,10 @@
 {
   "name": "rjstone",
-  "owner": { "name": "rjstone" },
+  "owner": {
+    "name": "rjstone"
+  },
   "metadata": {
-    "description": "Plugin marketplace (Cursor). Cursor sources must be in-repo paths; see AGENTS.md."
+    "description": "Pointer-only plugin marketplace: every entry's source lives in another repo."
   },
   "plugins": []
 }

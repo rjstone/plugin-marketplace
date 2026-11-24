@@ -1,5 +1,7 @@
 {
   "name": "rjstone",
-  "interface": { "displayName": "rjstone plugins" },
+  "interface": {
+    "displayName": "rjstone plugins"
+  },
   "plugins": []
 }

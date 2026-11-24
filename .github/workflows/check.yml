@@ -1,0 +1,16 @@
+name: check
+on: [push, pull_request]
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Generated catalogs are up to date
+        run: node scripts/build.ts --check
+      - name: Type-check config and scripts
+        run: npm run typecheck
+      - name: Validate the Claude Code catalog
+        run: npx -y @anthropic-ai/claude-code plugin validate .
