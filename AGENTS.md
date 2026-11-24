@@ -251,6 +251,29 @@ the vendor curates.
     server, and uses `${PLUGIN_ROOT}`.
   - Claude's `.mcp.json` uses `${CLAUDE_PLUGIN_ROOT}` instead.
 
+### Open Plugins (superseded) and AI Catalog
+
+- **Open Plugins** (`open-plugins.com`, from Vercel Labs' `vercel-labs/open-plugin`) came before
+  Agent Plugins. `open-plugins.com` now redirects to agent-plugins.org.
+  - Its marketplace spec ([archived 2026-07](https://web.archive.org/web/20260708065721/https://open-plugins.com/plugin-builders/marketplace))
+    put the file at the repo root as `marketplace.json`.
+  - Lookup order: `marketplace.json` → `.plugin/marketplace.json` → `.<tool>-plugin/marketplace.json`.
+    Copilot CLI's lookup order follows this.
+  - `source` had to be a **relative path starting with `./`**, so it can't point at other repos.
+  - Agent Plugins dropped the marketplace part. Its lead maintainer said "marketplaces are a
+    distribution artifact ... outside the scope of the spec"
+    ([discussion #42](https://github.com/agentplugins/agent-plugins-spec/discussions/42)).
+  - Don't generate this file. Since Copilot reads the root `marketplace.json` first, one placed
+    here would take priority over `.claude-plugin/marketplace.json` for Copilot.
+- **AI Catalog** ([ai-catalog.io](https://ai-catalog.io/), v0.9, release candidate for 1.0)
+  is what that maintainer personally recommends for distribution, along with
+  [ARD](https://agenticresourcediscovery.org/), which is built on AI Catalog.
+  - It's a general discovery JSON: `specVersion`, `host`, and `entries[]` of
+    `{identifier, type (media type), url}`. Catalogs can nest.
+  - It lists "Claude Code plugins" as one kind of thing it can index.
+  - No coding agent is known to install plugins from it. It's a possible extra generated output
+    for discoverability, not a replacement for the per-harness catalogs.
+
 ## Prior art (multi-harness marketplace templates)
 
 As of 2026-11, every template checked keeps plugins inside the repo (relative `./plugins/...`
@@ -261,7 +284,15 @@ sources). None demonstrate the pointer-only approach.
 - [thrsouza/ai-plugins-marketplace-template](https://github.com/thrsouza/ai-plugins-marketplace-template):
   Codex, Claude Code, Cursor, Antigravity, with empty stubs
 - [ai-plugin-marketplace/template](https://github.com/ai-plugin-marketplace/template):
-  Claude, Cursor, Kiro, Gemini
+  Claude, Cursor, Kiro, Gemini, Vercel Skills.
+  - It's a thin wrapper around the `@ai-plugin-marketplace/cli` + `core` npm toolkit
+    (`aipm build`/`validate`).
+  - It **generates** the Claude, Cursor, Codex and Open Plugins catalogs from
+    `aipm.workspace.ts` plus each plugin's `aipm.config.ts`.
+  - **No pointer-only support.** In core 0.11.0, `pipeline/build.js` sets every `source` to
+    `./<plugin folder in this repo>`, and the Codex output is hard-coded to
+    `{source: 'local'}`. The build-from-one-source idea and its committed-output freshness check
+    are worth copying.
 - [morris-frank/agent-plugin-template](https://github.com/morris-frank/agent-plugin-template):
   Claude, Codex, Cursor
 - [CarterCole/example-ai-marketplace](https://github.com/CarterCole/example-ai-marketplace):
