@@ -10,21 +10,29 @@ export default defineMarketplace({
   description: "Pointer-only plugin marketplace: every entry's source lives in another repo.",
   displayName: 'rjstone plugins',
   plugins: [
-    // Example: a plugin at the root of its own GitHub repo, pinned to a tag.
+    // Plugins are listed at their latest semver release tag (vX.Y.Z or X.Y.Z), resolved
+    // automatically into plugins.lock.json by scripts/update.ts. Do not pin by hand.
+    //
+    // Example: a plugin at the root of its own GitHub repo.
     // {
     //   name: 'my-plugin',
     //   description: 'What it does.',
-    //   source: { type: 'github', repo: 'rjstone/my-plugin', ref: 'v1.0.0' },
+    //   source: { type: 'github', repo: 'rjstone/my-plugin' },
     //   codex: { category: 'Productivity' },
     //   opencode: { package: '@rjstone/opencode-my-plugin' }, // only if published for opencode
-    //   pi: true,                                               // emit `git:github.com/...@v1.0.0`
+    //   pi: true,                                               // emit `git:github.com/...@<tag>`
     // },
     //
-    // Example: a plugin in a subdirectory of another repo, pinned to a commit.
+    // Example: a plugin in a subdirectory of another repo.
     // {
     //   name: 'other-plugin',
-    //   source: { type: 'github', repo: 'rjstone/claude', path: 'plugins/other-plugin',
-    //             sha: '0123456789abcdef0123456789abcdef01234567' },
+    //   source: { type: 'github', repo: 'rjstone/claude', path: 'plugins/other-plugin' },
+    // },
+    //
+    // Example: hold a plugin back on an older release.
+    // {
+    //   name: 'held-plugin',
+    //   source: { type: 'github', repo: 'rjstone/held-plugin', ref: 'v1.4.2' }, // hold back: must be a tag or sha, never a branch
     // },
   ],
 });
