@@ -1,0 +1,69 @@
+# Resolves every plugin's latest semver release tag, refreshes vendor/ copies and the generated
+# catalogs, and commits the result to main with the built-in GITHUB_TOKEN.
+#
+# Started by: plugin repos (docs/plugin-repo-release-workflow.yml, via workflow_dispatch),
+# a daily schedule, edits to marketplace.config.ts, or the "Run workflow" button.
+name: update
+on:
+  workflow_dispatch:
+    inputs:
+      repo:
+        description: Plugin repo that released (informational)
+        required: false
+        type: string
+      tag:
+        description: Tag that was pushed (informational)
+        required: false
+        type: string
+  schedule:
+    - cron: '23 9 * * *'
+  push:
+    branches: [main]
+    paths: [marketplace.config.ts]
+
+concurrency:
+  group: plugin-update
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Resolve release tags, sync vendor/, regenerate catalogs
+        id: update
+        env:
+          TRIGGER_REPO: ${{ inputs.repo }}
+          TRIGGER_TAG: ${{ inputs.tag }}
+        run: |
+          echo "trigger: ${TRIGGER_REPO:-schedule/config} ${TRIGGER_TAG}"
+          set +e
+          node scripts/update.ts --message-file "$RUNNER_TEMP/msg"
+          status=$?
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          test "$status" -ne 2
+      - name: Check generated files
+        # A failed plugin (status 1) is recorded in the lock, which --check reports as an error;
+        # everything else is still committed below, and the run is failed at the end.
+        run: node scripts/build.ts --check || test "${{ steps.update.outputs.status }}" = "1"
+      - name: Validate the Claude Code catalog
+        run: npx -y @anthropic-ai/claude-code plugin validate .
+      - name: Commit and push
+        run: |
+          if [ -z "$(git status --porcelain)" ]; then echo "nothing to commit"; exit 0; fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898333+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -F "$RUNNER_TEMP/msg"
+          git push
+      - name: Report plugin errors
+        if: steps.update.outputs.status != '0'
+        run: |
+          echo "Some plugins failed to update; see the step summary." >&2
+          exit 1

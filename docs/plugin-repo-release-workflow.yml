@@ -1,0 +1,39 @@
+# Copy into a plugin repo as .github/workflows/notify-marketplace.yml.
+#
+# When a release tag (vX.Y.Z or X.Y.Z) is pushed, this starts the marketplace's update workflow
+# so the new release is listed within minutes instead of at the next daily run. It cannot change
+# the marketplace: the GitHub App it uses needs only "Actions: Read and write" on the marketplace
+# repo (no Contents permission).
+#
+# Setup in THIS plugin repo (Settings -> Secrets and variables -> Actions):
+#   - variable MARKETPLACE_APP_ID: the GitHub App's ID
+#   - secret   MARKETPLACE_APP_PRIVATE_KEY: a private key (.pem) generated for that App
+# Then edit MARKETPLACE_OWNER / MARKETPLACE_REPO below.
+name: notify-marketplace
+on:
+  push:
+    tags: ['v*.*.*', '[0-9]*.[0-9]*.[0-9]*']
+
+env:
+  MARKETPLACE_OWNER: rjstone
+  MARKETPLACE_REPO: plugin-marketplace
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/create-github-app-token@v2
+        id: token
+        with:
+          app-id: ${{ vars.MARKETPLACE_APP_ID }}
+          private-key: ${{ secrets.MARKETPLACE_APP_PRIVATE_KEY }}
+          owner: ${{ env.MARKETPLACE_OWNER }}
+          repositories: ${{ env.MARKETPLACE_REPO }}
+      - name: Start the marketplace update workflow
+        env:
+          GH_TOKEN: ${{ steps.token.outputs.token }}
+        run: |
+          gh api -X POST "repos/$MARKETPLACE_OWNER/$MARKETPLACE_REPO/actions/workflows/update.yml/dispatches" \
+            -f ref=main \
+            -f "inputs[repo]=${{ github.repository }}" \
+            -f "inputs[tag]=${{ github.ref_name }}"

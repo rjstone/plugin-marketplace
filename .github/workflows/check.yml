@@ -8,6 +8,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Unit tests
+        run: npm test
       - name: Generated catalogs are up to date
         run: node scripts/build.ts --check
       - name: Type-check config and scripts
