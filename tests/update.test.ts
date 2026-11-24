@@ -96,3 +96,15 @@ test('config error returns 2 and writes nothing', async () => {
   assert.equal(await runUpdate({ root }), 2);
   assert.deepEqual(await readdir(root), ['marketplace.config.ts']);
 });
+
+test('CLI exits 3 on an unexpected crash (corrupt lock file)', async () => {
+  const { execFile } = await import('node:child_process');
+  const repo = await makeFixtureRepo(['v1.0.0'], CURSOR);
+  const root = await makeRoot(gitPlugin('a', repo.url));
+  await writeFile(path.join(root, 'plugins.lock.json'), '{ not json');
+  const script = fileURLToPath(new URL('../scripts/update.ts', import.meta.url));
+  const code = await new Promise<number | null>((resolve) => {
+    execFile('node', [script, '--root', root], (err) => resolve(err ? (err as { code?: number }).code ?? null : 0));
+  });
+  assert.equal(code, 3);
+});

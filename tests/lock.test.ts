@@ -151,3 +151,9 @@ test('readLock returns empty lock when file missing', async () => {
   const dir = await mkdtemp(path.join(os.tmpdir(), 'lock-'));
   assert.deepEqual(await readLock(dir), { plugins: {} });
 });
+
+test('multi-line fetch errors are stored as their first line only', async () => {
+  const { fetch } = fake({ [URL_A]: new Error('fatal: repository not found\nextra detail that varies 12345') });
+  const r = await resolveLock(cfg(pa), empty, fetch);
+  assert.equal(r.lock.plugins.a.error, 'fatal: repository not found');
+});

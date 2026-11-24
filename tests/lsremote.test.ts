@@ -26,3 +26,12 @@ test('lsRemoteTags reads a real local repo (annotated and lightweight)', async (
   assert.equal(m.get('v1.0.0'), repo.commits['v1.0.0']); // annotated
   assert.equal(m.get('v1.2.0'), repo.commits['v1.2.0']); // lightweight
 });
+
+test('lsRemoteTags failure message is a single stable line', async () => {
+  const missing = 'file:///tmp/no-such-repo-for-lsremote-test';
+  await assert.rejects(lsRemoteTags(missing), (err: Error) => {
+    assert.ok(!err.message.includes('\n'), err.message);
+    assert.match(err.message, /^fatal: /);
+    return true;
+  });
+});

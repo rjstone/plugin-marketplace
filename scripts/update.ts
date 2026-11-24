@@ -3,7 +3,8 @@
 //
 //   node scripts/update.ts [--root <dir>] [--config <file>] [--message-file <path>]
 //
-// Exit codes: 0 ok, 1 some plugin failed (everything else is still written), 2 config invalid.
+// Exit codes: 0 ok, 1 some plugin failed (everything else is still written), 2 config invalid,
+// 3 unexpected crash.
 
 import { appendFile, readFile, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
@@ -66,9 +67,15 @@ function arg(name: string): string | undefined {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
-  process.exitCode = await runUpdate({
-    root: arg('--root') ?? REPO_ROOT,
-    configPath: arg('--config'),
-    messageFile: arg('--message-file'),
-  });
+  try {
+    process.exitCode = await runUpdate({
+      root: arg('--root') ?? REPO_ROOT,
+      configPath: arg('--config'),
+      messageFile: arg('--message-file'),
+    });
+  } catch (err) {
+    // A crash (corrupt lock, fs error) must not look like "a plugin failed" (exit 1).
+    console.error(`crash: ${err instanceof Error ? err.stack ?? err.message : String(err)}`);
+    process.exitCode = 3;
+  }
 }

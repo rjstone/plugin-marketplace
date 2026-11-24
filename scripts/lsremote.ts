@@ -25,11 +25,25 @@ export function parseLsRemoteTags(output: string): Map<string, string> {
   return tags;
 }
 
+/**
+ * Reduce a failed git call to one stable line (the `fatal:`/`error:` line when there is one), so
+ * a plugin that keeps failing does not rewrite plugins.lock.json with new error text every run.
+ */
+export function gitErrorLine(err: unknown): string {
+  const e = err as { stderr?: string; message?: string };
+  const lines = String(e.stderr ?? '').split('\n').map((l) => l.trim()).filter(Boolean);
+  return lines.find((l) => /^(fatal|error):/.test(l)) ?? lines[0] ?? String(e.message ?? err).split('\n')[0];
+}
+
 export async function lsRemoteTags(url: string): Promise<Map<string, string>> {
-  const { stdout } = await run('git', ['ls-remote', '--tags', url], {
-    env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
-    timeout: 60_000,
-    maxBuffer: 32 * 1024 * 1024,
-  });
-  return parseLsRemoteTags(stdout);
+  try {
+    const { stdout } = await run('git', ['ls-remote', '--tags', url], {
+      env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
+      timeout: 60_000,
+      maxBuffer: 32 * 1024 * 1024,
+    });
+    return parseLsRemoteTags(stdout);
+  } catch (err) {
+    throw new Error(gitErrorLine(err));
+  }
 }

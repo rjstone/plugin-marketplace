@@ -64,7 +64,7 @@ async function resolveOne(
   try {
     tags = await fetchTags(url);
   } catch (err) {
-    return { error: err instanceof Error ? err.message : String(err), override };
+    return { error: (err instanceof Error ? err.message : String(err)).split('\n')[0], override };
   }
   if (override) {
     const commit = tags.get(s.ref!);
