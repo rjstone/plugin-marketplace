@@ -13,19 +13,41 @@ instead of copying plugin code here. It may later be published as a public templ
 
 - Commit and push directly to `main`. No feature branches or PRs unless asked.
 
+## Key finding: `.claude-plugin/marketplace.json` is a de facto shared format
+
+Many harnesses read Claude Code's catalog location and schema, either directly or as a
+fallback. **That file is the main catalog.** Add harness-specific files only where a harness
+needs fields Claude's schema lacks (Codex's `policy`), or doesn't read Claude's file at all
+(Cursor).
+
+| Reads `.claude-plugin/marketplace.json` | How |
+|---|---|
+| Claude Code | native |
+| OpenAI Codex | "legacy-compatible" location; native file is `.agents/plugins/marketplace.json` |
+| GitHub Copilot CLI | last in its lookup order (`marketplace.json` → `.plugin/` → `.github/plugin/` → `.claude-plugin/`) |
+| VS Code agent plugins (experimental) | its docs point to Claude's marketplace schema |
+| Factory Droid | fallback after `.factory-plugin/marketplace.json` |
+| Augment Auggie | supported alongside `.augment-plugin/marketplace.json` |
+| JetBrains Junie CLI | alternative to `.junie-extension/marketplace.json` |
+| Qwen Code | uses Claude marketplaces; no catalog file of its own |
+
+Open question: does one file with both Claude-only and Codex-only fields work in every reader?
+Untested. Codex requires `policy` and `category`, and every other reader would need to ignore
+those fields.
+
 ## Layout
 
 | Path | Harness | Status |
 |---|---|---|
-| `.claude-plugin/marketplace.json` | Claude Code (Codex also reads it as "legacy-compatible") | stub, `plugins: []` |
-| `.agents/plugins/marketplace.json` | OpenAI Codex (CLI + ChatGPT desktop) | stub, `plugins: []` |
+| `.claude-plugin/marketplace.json` | Claude Code + the readers above | stub, `plugins: []` |
+| `.agents/plugins/marketplace.json` | OpenAI Codex | stub, `plugins: []` |
 | `.cursor-plugin/marketplace.json` | Cursor | stub, `plugins: []` |
-| (undecided) | opencode | no marketplace concept; see below |
+| `opencode/opencode.jsonc` | opencode | config snippet, not a catalog (see below) |
 
-All three catalogs use the marketplace `name` **`rjstone`**, so installs read `<plugin>@rjstone`.
-If you rename it, change all three together.
+All catalogs use the marketplace `name` **`rjstone`**, so installs read `<plugin>@rjstone`.
+If you rename it, change every catalog together.
 
-## Per-harness reference
+## Harnesses with a catalog that can point at other repos
 
 Start from the linked docs. The notes below are short summaries, not the whole spec.
 
@@ -35,7 +57,7 @@ Start from the linked docs. The notes below are short summaries, not the whole s
   [create a marketplace](https://code.claude.com/docs/en/plugins/create-marketplace),
   [host a marketplace](https://code.claude.com/docs/en/plugins/host-marketplace),
   [plugin manifest reference](https://code.claude.com/docs/en/plugins/manifest-reference).
-- **Plugins in other repos: yes.** Source types are:
+- Source types:
   - a relative path inside this repo
   - `github` (`repo`)
   - `url` (any git URL)
@@ -58,8 +80,7 @@ Start from the linked docs. The notes below are short summaries, not the whole s
 
 - Docs: [Build plugins (marketplace sections)](https://developers.openai.com/plugins/build/plugins),
   [Plugins overview](https://learn.chatgpt.com/docs/plugins).
-- **Plugins in other repos: yes.** The docs say a marketplace file "can live ... in a separate
-  marketplace repo". Source types are:
+- Native catalog: `.agents/plugins/marketplace.json`. Source types are:
   - `local` (`path`, written `./`-relative to the marketplace root)
   - `url` (git repo whose root is the plugin)
   - `git-subdir` (`url` + `path`)
@@ -68,10 +89,61 @@ Start from the linked docs. The notes below are short summaries, not the whole s
   skipped.
 - Every entry must have `policy.installation`, `policy.authentication` and `category`.
   `interface.displayName` sets the catalog title.
-- Codex also reads `.claude-plugin/marketplace.json`. It's untested whether one shared file
-  can serve both tools, so keep two files for now.
 - Add the marketplace: `codex plugin marketplace add rjstone/plugin-marketplace` (accepts
   `--ref` and `--sparse PATH`).
+
+### GitHub Copilot CLI and VS Code
+
+- Docs:
+  - [CLI plugin reference](https://docs.github.com/en/copilot/reference/copilot-cli-reference/cli-plugin-reference)
+  - [plugin and marketplace reference](https://docs.github.com/en/copilot/reference/plugin-and-marketplace-reference)
+  - [create and share marketplaces](https://docs.github.com/en/copilot/how-tos/copilot-on-github/customize-copilot/create-and-share-plugin-marketplaces)
+  - [official starter](https://github.com/github/plugin-marketplace-starter)
+- Native catalog: `.github/plugin/marketplace.json`. Copilot also reads Claude's file, so no
+  separate stub is needed.
+- Sources: a relative path, `{"source":"github","repo":...,"ref":...,"path":...}`, or `url`,
+  each with optional `sha`.
+- Commands:
+  - `copilot plugin marketplace add owner/repo[#ref]`
+  - `copilot plugin install <plugin>@<marketplace>`
+- A repo can set default marketplaces in `.github/copilot/settings.json`.
+- VS Code: [agent plugin reference](https://code.visualstudio.com/docs/agents/reference/agent-plugin-reference),
+  [agent plugins](https://code.visualstudio.com/docs/agent-customization/agent-plugins).
+  - Add marketplaces through the `chat.plugins.marketplaces` setting (`owner/repo#ref|sha`, a git
+    URL, or `file:///`).
+  - VS Code auto-detects Agent Plugins, Copilot and Claude plugin manifests.
+
+### Factory Droid, Augment Auggie, JetBrains Junie, Qwen Code
+
+These four read Claude's file; their native paths are optional. Researched from docs, with
+some details taken from search excerpts only.
+
+- Factory Droid:
+  - native catalog: `.factory-plugin/marketplace.json`
+  - sources: Claude-style objects and npm
+  - docs: [plugins](https://docs.factory.ai/cli/configuration/plugins)
+- Augment Auggie:
+  - native catalog: `.augment-plugin/marketplace.json`
+  - docs: [plugins](https://docs.augmentcode.com/cli/plugins)
+- JetBrains Junie CLI:
+  - native catalog: `.junie-extension/marketplace.json`
+  - add with `/extensions marketplace add`
+  - docs: [extensions](https://junie.jetbrains.com/docs/junie-cli-extensions.html)
+- Qwen Code:
+  - add with `qwen extensions sources add <repo>`
+  - install with `qwen extensions install <mkt>:<plugin>`
+  - docs: [extensions](https://qwenlm.github.io/qwen-code-docs/en/users/extension/introduction)
+
+### Devin
+
+- Docs: [plugins overview](https://docs.devin.ai/cli/extensibility/plugins/overview).
+- No `marketplace.json`. Instead, a "meta-plugin" `.devin-plugin/plugin.json` lists
+  `requiredPlugins` / `optionalPlugins`, and that list acts as the catalog.
+- Sources: `github`, `url`, `git-subdir`, with `ref`/`sha`.
+- Devin also reads `.claude-plugin/plugin.json`, a *plugin* manifest, not a catalog.
+- Not stubbed yet.
+
+## Harnesses where catalog sources must live in this repo
 
 ### Cursor
 
@@ -79,42 +151,113 @@ Start from the linked docs. The notes below are short summaries, not the whole s
   [Plugins](https://cursor.com/docs/plugins),
   [official template](https://github.com/cursor/plugin-template),
   [official plugins repo](https://github.com/cursor/plugins).
-- **Plugins in other repos: not documented.** `source` is a plugin folder (or an object with
-  `path`) inside this repo, and the rules forbid `..` and absolute paths. Options:
+- `source` is a plugin folder (or an object with `path`) inside this repo, and the rules forbid
+  `..` and absolute paths. Pointing at other repos isn't documented. Options:
   - git submodules, but whether Cursor's importer fetches submodules is unverified
   - adding each plugin repo to Cursor directly
-- Cursor also loads plugins that follow the open
-  [Agent Plugins](https://agent-plugins.org) standard
-  ([spec](https://github.com/agentplugins/agent-plugins-spec)). That standard is a lead for a
-  shared cross-harness format and hasn't been researched yet.
 
-### opencode (undecided)
+### Kimi Code CLI (uncertain)
+
+- Docs: [plugins](https://www.kimi.com/code/docs/en/kimi-code-cli/customization/plugins).
+- Uses a custom marketplace JSON given by path or URL (`/plugins marketplace <src>` or
+  `KIMI_CODE_PLUGIN_MARKETPLACE_URL`).
+- The example only shows `"source": "./my-plugin"`. Whether it accepts external sources is
+  unconfirmed.
+
+## Harnesses with no catalog you can host
+
+These have no catalog file you can host. Plugins install one repo at a time, or from a list
+the vendor curates.
+
+### opencode
 
 - Docs: [Build plugins](https://opencode.ai/docs/build/plugins/),
   [Configure plugins](https://opencode.ai/docs/plugins/).
-- **No marketplace concept.** Plugins are either npm packages or local paths, listed under
-  `"plugins"` in `opencode.json(c)`. There's no catalog file and no git source.
-- Options:
-  - ship an `opencode.jsonc` here listing npm-published plugins
-  - ship an `INSTALL.md` that the agent fetches and follows (the
-    [superpowers](https://github.com/obra/superpowers) approach)
+- Plugins are npm packages or local paths, listed under `"plugins"` in `opencode.json(c)`.
+- `opencode/opencode.jsonc` here is a snippet of plugin lines. An agent picks the ones the user
+  asks for and merges them into the user's opencode config.
 
-### Seen but not researched
+### Pi
 
-Other repos have marketplace or plugin folders for these harnesses, but their docs haven't been
-checked yet:
+- Docs: [packages](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/packages.md),
+  [gallery](https://pi.dev/packages).
+- Install from npm, git or a local path:
+  - `pi install npm:@x/y@1.0.0`
+  - `pi install git:github.com/x/y@v1`
+  - `pi install ./local`
+- Installed packages are recorded in `packages` in `~/.pi/agent/settings.json`, or in
+  `.pi/settings.json` with `--local`.
+- The gallery lists npm packages that have the keyword `pi-package`.
+- A pointer list here would be a `packages` snippet, the same approach as opencode.
 
-- Muse (`.muse-plugin/marketplace.json`)
-- Hermes, Kimi, Devin, Antigravity, Pi (`.<harness>-plugin/` or `.pi/`)
-- GitHub Copilot, Kiro, Gemini (named by other templates)
+### Google Antigravity vs Gemini CLI (two different systems)
 
-Check each harness's docs before adding a stub.
+- Antigravity ([plugins](https://antigravity.google/docs/plugins)):
+  - plugin manifest: `plugin.json` at the root, or `.antigravity-plugin/plugin.json`
+  - install with `agy plugin install <github-url>`
+  - the only marketplace allowed is `antigravity-plugins-official`
+  - `agy plugin import gemini|claude` migrates existing Gemini extensions or Claude plugins
+  - follows Agent Plugins
+- Gemini CLI ([releasing extensions](https://geminicli.com/docs/extensions/releasing)):
+  - each extension has `gemini-extension.json`
+  - install with `gemini extensions install <git-url> [--ref]`
+  - the gallery crawls GitHub repos tagged with the topic `gemini-cli-extension`
+  - possible custom registry via `experimental.extensionRegistryURI` (unverified)
+
+### Others
+
+- **Kiro**:
+  - [powers](https://kiro.dev/docs/powers/installation)
+  - official registry plus "Import power from GitHub"
+  - accepts Agent Plugins `plugin.json` or `POWER.md`
+- **Cline**:
+  - [plugins](https://docs.cline.bot/customization/plugins)
+  - central `cline/marketplace` repo, added to by PR
+  - `cline plugin install <git-url>`
+- **Hermes Agent**:
+  - [plugin catalog](https://hermes-agent.nousresearch.com/docs/user-guide/features/plugin-catalog)
+  - plugins go into the central catalog by PR
+  - for *skills*, any GitHub repo can be a "tap": `hermes skills tap add owner/repo`
+- **Amp**:
+  - [plugins](https://ampcode.com/docs/customize/plugins)
+  - TS/JS modules
+  - `amp plugins add <url>`
+- **Roo Code, Goose, Zed**: curated central marketplaces only.
+- **No evidence found yet**: Windsurf, Crush, Muse. Z.ai zcode reportedly uses a Claude-style
+  `marketplace.json` (unverified).
+
+## Agent Plugins open standard
+
+- Links: [agent-plugins.org](https://agent-plugins.org),
+  [spec 1.0.0](https://agent-plugins.org/specification),
+  [manifest](https://agent-plugins.org/plugin-authors/manifest),
+  [compatible clients](https://agent-plugins.org/compatible-clients),
+  [spec repo](https://github.com/agentplugins/agent-plugins-spec).
+- Governance: a vendor-neutral steering committee with members from Amazon, Cursor, Microsoft,
+  OpenAI and Vercel. 1.0.0 is published; 1.1.0 is a draft that adds hooks and icons.
+- Clients listed as compatible include VS Code, Cursor, Copilot, ChatGPT/Codex, Kiro, Hermes,
+  Antigravity and OpenHands. **Claude Code is not listed.**
+- It's a **plugin** format, not a catalog format:
+  - root `plugin.json` with `$schema`
+  - `skills/<name>/SKILL.md`
+  - root `mcp.json`
+  - `${PLUGIN_ROOT}` / `${PLUGIN_DATA}` variables
+- It deliberately defines no marketplace or registry. Registries are listed only under
+  [future considerations](https://github.com/agentplugins/agent-plugins-spec/blob/main/FUTURE_CONSIDERATIONS.md).
+- **For this repo:** it affects how *plugin* repos are laid out, not the catalogs here. A plugin
+  can carry both a root `plugin.json` (Agent Plugins) and `.claude-plugin/plugin.json`, sharing
+  `skills/`.
+  - Watch for one difference: Agent Plugins' `mcp.json` needs `$schema` and a `type` on each
+    server, and uses `${PLUGIN_ROOT}`.
+  - Claude's `.mcp.json` uses `${CLAUDE_PLUGIN_ROOT}` instead.
 
 ## Prior art (multi-harness marketplace templates)
 
 As of 2026-11, every template checked keeps plugins inside the repo (relative `./plugins/...`
 sources). None demonstrate the pointer-only approach.
 
+- [github/plugin-marketplace-starter](https://github.com/github/plugin-marketplace-starter):
+  GitHub's official Copilot starter
 - [thrsouza/ai-plugins-marketplace-template](https://github.com/thrsouza/ai-plugins-marketplace-template):
   Codex, Claude Code, Cursor, Antigravity, with empty stubs
 - [ai-plugin-marketplace/template](https://github.com/ai-plugin-marketplace/template):
@@ -130,9 +273,13 @@ sources). None demonstrate the pointer-only approach.
 
 ## Adding a plugin
 
-1. In `.claude-plugin/marketplace.json`, add an entry with a `github` or `git-subdir` source.
+1. In `.claude-plugin/marketplace.json`, add an entry with a `github` or `git-subdir` source,
+   pinned with `ref` or `sha`. This one entry covers every harness in the "Key finding" table.
 2. In `.agents/plugins/marketplace.json`, add an entry with a `url` or `git-subdir` source, plus
    `policy` and `category`.
 3. Cursor: skip it unless the plugin is vendored here; see the Cursor section.
-4. Use the same plugin `name` in every catalog, matching the plugin's own manifest `name`.
-5. Run `claude plugin validate .` and check each file with `jq . <file>`.
+4. opencode / Pi: if the plugin is published as an npm or pi package, add its line to the
+   snippet.
+5. Use the same plugin `name` in every catalog, matching the plugin's own manifest `name`.
+6. Run `claude plugin validate .` and check each file with `jq . <file>` (use `jq` on the
+   `.jsonc` file only after stripping its comments).

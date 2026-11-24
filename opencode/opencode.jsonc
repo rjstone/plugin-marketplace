@@ -1,0 +1,7 @@
+// The closest thing to a "marketplace" for opencode is just an opencode config snippet
+// with plugin configuration lines that an agent can pick-and-choose to add to the user's
+// opencode config as requested.
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugins": []
+}
