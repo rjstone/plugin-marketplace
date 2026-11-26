@@ -1,4 +1,5 @@
-// Resolve every git-sourced plugin to its latest semver release tag, refresh vendor/ copies,
+// Resolve every git-sourced plugin to its latest semver release tag, refresh vendor/ copies
+// (only when the marketplace has cursor on; otherwise leftover copies are removed),
 // and regenerate every catalog. Run by .github/workflows/update.yml; safe to run locally.
 //
 //   node scripts/update.ts [--root <dir>] [--config <file>] [--message-file <path>]
@@ -42,7 +43,7 @@ export async function runUpdate(opts: UpdateOptions): Promise<number> {
   if (!existsSync(lockFile) || (await readFile(lockFile, 'utf8')) !== lockText) await writeFile(lockFile, lockText);
 
   const vendored = await syncVendor(cfg, resolved.lock, root, opts.fetchSnapshot ?? gitFetchSnapshot);
-  for (const f of await writeOutputs(root, buildOutputs(cfg, resolved.lock, await vendorReady(cfg, resolved.lock, root)))) console.log(`wrote ${f}`);
+  for (const line of await writeOutputs(root, buildOutputs(cfg, resolved.lock, await vendorReady(cfg, resolved.lock, root)))) console.log(line);
   const consistency = await checkConsistency(cfg, resolved.lock, root);
 
   const changes = [...resolved.changes, ...vendored.changes];

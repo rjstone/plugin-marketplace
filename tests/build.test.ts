@@ -1,9 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { buildOutputs, checkConsistency } from '../scripts/build.ts';
+import { buildOutputs, checkConsistency, validateConfig, writeOutputs } from '../scripts/build.ts';
 import { isVendored } from '../scripts/vendor.ts';
 import type { LockFile } from '../scripts/lock.ts';
 import type { MarketplaceConfig, PluginDef } from '../scripts/types.ts';
@@ -19,7 +20,9 @@ const lock: LockFile = { plugins: {
   b: { url: 'https://gl.example/o/b.git', path: 'plugins/b', tag: '2.0.0', commit: c('2'), override: false },
   s: { url: 'https://github.com/o/s.git', tag: null, commit: c('7'), override: true },
 } };
-const cfg = (...plugins: PluginDef[]): MarketplaceConfig => ({ name: 'm', owner: { name: 'o' }, plugins });
+// Cursor on, so the vendor/ and Cursor paths stay covered while the feature is deferred.
+const cfg = (...plugins: PluginDef[]): MarketplaceConfig => ({ name: 'm', owner: { name: 'o' }, cursor: true, plugins });
+const cfgOff = (...plugins: PluginDef[]): MarketplaceConfig => ({ name: 'm', owner: { name: 'o' }, plugins });
 
 function catalog(out: Map<string, string>, file: string): any {
   const raw = out.get(file)!;
@@ -28,11 +31,11 @@ function catalog(out: Map<string, string>, file: string): any {
 const entry = (cat: any, name: string) => cat.plugins.find((p: any) => p.name === name);
 
 test('isVendored defaults to git sources not excluded from cursor', () => {
-  assert.equal(isVendored(pa), true);
-  assert.equal(isVendored({ ...pa, exclude: ['cursor'] }), false);
-  assert.equal(isVendored({ ...pa, vendor: false }), false);
-  assert.equal(isVendored(pl), false);
-  assert.equal(isVendored({ name: 'n', source: { type: 'npm', package: 'p' } }), false);
+  assert.equal(isVendored(cfg(), pa), true);
+  assert.equal(isVendored(cfg(), { ...pa, exclude: ['cursor'] }), false);
+  assert.equal(isVendored(cfg(), { ...pa, vendor: false }), false);
+  assert.equal(isVendored(cfg(), pl), false);
+  assert.equal(isVendored(cfg(), { name: 'n', source: { type: 'npm', package: 'p' } }), false);
 });
 
 test('claude github entry carries ref and sha from lock', () => {
@@ -158,4 +161,42 @@ test('consistency: lock entry whose url differs from the config is a warning', a
   const moved: PluginDef = { name: 'a', source: { type: 'github', repo: 'o/new-home' }, vendor: false };
   const res = await checkConsistency(cfg(moved), { plugins: { a: lock.plugins.a } }, await root());
   assert.deepEqual(res.warnings, ['a: plugins.lock.json entry does not match the config source yet (run node scripts/update.ts)']);
+});
+
+// ---------- Cursor off (the default) ----------
+
+test('cursor off: nothing is vendored, even with vendor: true', () => {
+  assert.equal(isVendored(cfgOff(), pa), false);
+  assert.equal(isVendored(cfgOff(), { ...pa, vendor: true }), false);
+});
+
+test('cursor off: the Cursor catalog must not exist; other catalogs are unaffected', () => {
+  const out = buildOutputs(cfgOff(pa, pl), lock, new Set(['a']));
+  assert.equal(out.get('.cursor-plugin/marketplace.json'), null);
+  assert.ok(entry(catalog(out, '.claude-plugin/marketplace.json'), 'a'));
+  assert.ok(entry(catalog(out, '.agents/plugins/marketplace.json'), 'a'));
+});
+
+test('cursor off: no Cursor warnings; vendor: true warns that it has no effect', () => {
+  const npm: PluginDef = { name: 'n', source: { type: 'npm', package: 'p' } };
+  assert.deepEqual(validateConfig(cfgOff(pa, npm, { ...pb, vendor: false }), '/').warnings, []);
+  assert.match(validateConfig(cfgOff({ ...pa, vendor: true }), '/').warnings.join('\n'), /no effect/);
+  assert.match(validateConfig(cfg(npm), '/').warnings.join('\n'), /not listed for Cursor/);
+});
+
+test('cursor off: writeOutputs removes a leftover Cursor catalog', async () => {
+  const r = await root();
+  await mkdir(path.join(r, '.cursor-plugin'), { recursive: true });
+  await writeFile(path.join(r, '.cursor-plugin/marketplace.json'), '{}\n');
+  const lines = await writeOutputs(r, buildOutputs(cfgOff(), { plugins: {} }));
+  assert.ok(lines.includes('removed .cursor-plugin/marketplace.json'));
+  assert.equal(existsSync(path.join(r, '.cursor-plugin/marketplace.json')), false);
+  assert.ok(lines.includes('wrote .claude-plugin/marketplace.json'));
+});
+
+test('cursor off: a leftover vendor/ folder is a consistency error', async () => {
+  const r = await root();
+  await mkdir(path.join(r, 'vendor/a'), { recursive: true });
+  const res = await checkConsistency(cfgOff(pa), { plugins: { a: lock.plugins.a } }, r);
+  assert.deepEqual(res.errors, ['vendor/a: not a vendored plugin in the config']);
 });

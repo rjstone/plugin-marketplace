@@ -1,4 +1,4 @@
-# Resolves every plugin's latest semver release tag, refreshes vendor/ copies and the generated
+# Resolves every plugin's latest semver release tag, refreshes vendor/ copies (only with cursor: true) and the generated
 # catalogs, and commits the result to main with the built-in GITHUB_TOKEN.
 #
 # Started by: plugin repos (docs/plugin-repo-release-workflow.yml, via workflow_dispatch),

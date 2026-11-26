@@ -11,10 +11,11 @@ import { makeFixtureRepo } from './helpers.ts';
 const TYPES = pathToFileURL(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../scripts/types.ts')).href;
 const CURSOR = { '.cursor-plugin/plugin.json': '{"name":"a"}\n', 'README.md': 'one\n' };
 
-async function makeRoot(plugins: string, name = 'm'): Promise<string> {
+// Cursor on by default here, so the vendor/ path stays covered while the feature is deferred.
+async function makeRoot(plugins: string, name = 'm', cursor = true): Promise<string> {
   const root = await mkdtemp(path.join(os.tmpdir(), 'update-root-'));
   await writeFile(path.join(root, 'marketplace.config.ts'),
-    `import { defineMarketplace } from '${TYPES}';\nexport default defineMarketplace({ name: '${name}', owner: { name: 'o' }, plugins: [${plugins}] });\n`);
+    `import { defineMarketplace } from '${TYPES}';\nexport default defineMarketplace({ name: '${name}', owner: { name: 'o' }, cursor: ${cursor}, plugins: [${plugins}] });\n`);
   return root;
 }
 const gitPlugin = (name: string, url: string) => `{ name: '${name}', source: { type: 'git', url: '${url}' } }`;
@@ -107,4 +108,23 @@ test('CLI exits 3 on an unexpected crash (corrupt lock file)', async () => {
     execFile('node', [script, '--root', root], (err) => resolve(err ? (err as { code?: number }).code ?? null : 0));
   });
   assert.equal(code, 3);
+});
+
+test('cursor off: no vendor/ copy and no Cursor catalog; turning it off cleans both up', async () => {
+  const repo = await makeFixtureRepo(['v1.0.0'], CURSOR);
+  const off = await makeRoot(gitPlugin('a', repo.url), 'm', false);
+  assert.equal(await runUpdate({ root: off }), 0);
+  assert.equal(existsSync(path.join(off, 'vendor')), false);
+  assert.equal(existsSync(path.join(off, '.cursor-plugin/marketplace.json')), false);
+  assert.ok(entry(await json(off, '.claude-plugin/marketplace.json'), 'a'));
+
+  const was = await makeRoot(gitPlugin('a', repo.url));
+  assert.equal(await runUpdate({ root: was }), 0);
+  assert.ok(existsSync(path.join(was, 'vendor/a/README.md')));
+  // A new file: import() caches modules by URL, so rewriting the same config would not reload it.
+  const offConfig = path.join(was, 'off.config.ts');
+  await writeFile(offConfig, (await readFile(path.join(was, 'marketplace.config.ts'), 'utf8')).replace('cursor: true', 'cursor: false'));
+  assert.equal(await runUpdate({ root: was, configPath: offConfig }), 0);
+  assert.equal(existsSync(path.join(was, 'vendor/a')), false);
+  assert.equal(existsSync(path.join(was, '.cursor-plugin/marketplace.json')), false);
 });

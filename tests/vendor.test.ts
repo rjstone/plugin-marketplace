@@ -11,7 +11,7 @@ import type { MarketplaceConfig, PluginDef } from '../scripts/types.ts';
 import { makeFixtureRepo } from './helpers.ts';
 
 const CURSOR = { '.cursor-plugin/plugin.json': '{"name":"a"}\n', 'README.md': 'one\n' };
-const cfg = (...plugins: PluginDef[]): MarketplaceConfig => ({ name: 'm', owner: { name: 'o' }, plugins });
+const cfg = (...plugins: PluginDef[]): MarketplaceConfig => ({ name: 'm', owner: { name: 'o' }, cursor: true, plugins });
 const root = () => mkdtemp(path.join(os.tmpdir(), 'vendor-root-'));
 const plugin = (url: string, extra: Partial<PluginDef> = {}): PluginDef => ({ name: 'a', source: { type: 'git', url }, ...extra });
 const lockOf = (url: string, tag: string | null, commit: string, p?: string): LockFile =>

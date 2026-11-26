@@ -58,7 +58,8 @@ export interface PluginDef {
   tags?: string[];
   source: PluginSource;
   /**
-   * Copy into vendor/ for harnesses that can't point at other repos (Cursor).
+   * Copy into vendor/ for harnesses that can't point at other repos (Cursor). Has no effect
+   * unless the marketplace sets `cursor: true`.
    * Default: true for github/git sources not excluded from Cursor.
    */
   vendor?: boolean;
@@ -80,6 +81,11 @@ export interface MarketplaceConfig {
   description?: string;
   /** Codex catalog title. Default: `name`. */
   displayName?: string;
+  /**
+   * Generate the Cursor catalog (.cursor-plugin/marketplace.json) and the vendor/ copies it
+   * needs. Default: false (Cursor support is deferred; see AGENTS.md "Cursor").
+   */
+  cursor?: boolean;
   plugins: PluginDef[];
 }
 

@@ -22,7 +22,9 @@ export interface VendorStamp {
   commit: string;
 }
 
-export function isVendored(p: PluginDef): boolean {
+/** Whether a plugin gets a vendor/ copy. Always false while the marketplace has Cursor off. */
+export function isVendored(cfg: MarketplaceConfig, p: PluginDef): boolean {
+  if (cfg.cursor !== true) return false;
   const git = p.source.type === 'github' || p.source.type === 'git';
   return git && (p.vendor ?? !p.exclude?.includes('cursor'));
 }
@@ -74,9 +76,9 @@ export async function syncVendor(
   const warnings: string[] = [];
   const errors: string[] = [];
   const vendorRoot = path.join(root, VENDOR_DIR);
-  const wanted = new Set(cfg.plugins.filter(isVendored).map((p) => p.name));
+  const wanted = new Set(cfg.plugins.filter((p) => isVendored(cfg, p)).map((p) => p.name));
 
-  for (const p of cfg.plugins.filter(isVendored)) {
+  for (const p of cfg.plugins.filter((p) => isVendored(cfg, p))) {
     const e = lock.plugins[p.name];
     if (!e?.commit) continue;
     if (stampMatches(await readStamp(root, p.name), e)) continue;
@@ -149,7 +151,7 @@ export async function syncVendor(
 /** Names of vendored plugins whose copy in vendor/ is exactly at their locked release. */
 export async function vendorReady(cfg: MarketplaceConfig, lock: LockFile, root: string): Promise<Set<string>> {
   const ready = new Set<string>();
-  for (const p of cfg.plugins.filter(isVendored)) {
+  for (const p of cfg.plugins.filter((p) => isVendored(cfg, p))) {
     const e = lock.plugins[p.name];
     if (e?.commit && stampMatches(await readStamp(root, p.name), e)) ready.add(p.name);
   }

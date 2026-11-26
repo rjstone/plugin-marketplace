@@ -9,6 +9,9 @@ export default defineMarketplace({
   owner: { name: 'rjstone' },
   description: "Pointer-only plugin marketplace: every entry's source lives in another repo.",
   displayName: 'rjstone plugins',
+  // Cursor support is deferred (see AGENTS.md "Cursor"). `true` brings back the Cursor catalog
+  // and the vendor/ copies it needs; the next update run fills them in.
+  cursor: false,
   plugins: [
     // Plugins are listed at their latest semver release tag (vX.Y.Z or X.Y.Z), resolved
     // automatically into plugins.lock.json by scripts/update.ts. Do not pin by hand.

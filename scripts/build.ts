@@ -9,7 +9,7 @@
 // sha = commit); run scripts/update.ts to refresh it. Needs Node >= 22.18. No dependencies.
 
 import { existsSync } from 'node:fs';
-import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { LOCK_FILE, pluginGitUrl, readLock } from './lock.ts';
@@ -77,12 +77,11 @@ export function validateConfig(cfg: MarketplaceConfig, root: string): { errors: 
     if (s.type === 'local' && !existsSync(path.join(root, s.path))) errors.push(`${where}: local path ${s.path} does not exist`);
     if (p.vendor && !git) errors.push(`${where}: vendor applies only to github/git sources`);
 
-    if (!git && s.type !== 'local' && !p.exclude?.includes('cursor')) {
-      warnings.push(`${where}: not listed for Cursor (Cursor only accepts folders inside this repo)`);
+    if (cfg.cursor === true && !p.exclude?.includes('cursor')) {
+      if (!git && s.type !== 'local') warnings.push(`${where}: not listed for Cursor (Cursor only accepts folders inside this repo)`);
+      if (git && !isVendored(cfg, p)) warnings.push(`${where}: vendor is false, so it is not listed for Cursor`);
     }
-    if (git && !isVendored(p) && !p.exclude?.includes('cursor')) {
-      warnings.push(`${where}: vendor is false, so it is not listed for Cursor`);
-    }
+    if (cfg.cursor !== true && p.vendor === true) warnings.push(`${where}: vendor has no effect while the marketplace has cursor off`);
     if (p.pi !== undefined && (p.pi === true || p.pi.source === undefined)) {
       if (s.type === 'local') errors.push(`${where}: pi needs an explicit pi.source for a local plugin`);
       if (git && s.path) errors.push(`${where}: pi cannot install a subdirectory; set pi.source explicitly`);
@@ -154,9 +153,13 @@ function header(cfg: MarketplaceConfig): Json {
   });
 }
 
-/** `ready`: vendored plugins whose vendor/ copy matches the lock (see vendorReady); others are left out of Cursor. */
-export function buildOutputs(cfg: MarketplaceConfig, lock: LockFile, ready: Set<string> = new Set()): Map<string, string> {
-  const out = new Map<string, string>();
+/**
+ * Every generated file, by path relative to the repo root. A `null` value means the file must
+ * not exist (its harness is turned off), so writing deletes it and --check flags it.
+ * `ready`: vendored plugins whose vendor/ copy matches the lock (see vendorReady); others are left out of Cursor.
+ */
+export function buildOutputs(cfg: MarketplaceConfig, lock: LockFile, ready: Set<string> = new Set()): Map<string, string | null> {
+  const out = new Map<string, string | null>();
   const listable = cfg.plugins
     .map((p) => ({ p, ...lockFor(p, lock) }))
     .filter((x) => x.listable);
@@ -188,10 +191,10 @@ export function buildOutputs(cfg: MarketplaceConfig, lock: LockFile, ready: Set<
     })),
   }));
 
-  out.set('.cursor-plugin/marketplace.json', json({
+  out.set('.cursor-plugin/marketplace.json', cfg.cursor !== true ? null : json({
     ...header(cfg),
     plugins: listable
-      .filter(({ p }) => included(p, 'cursor') && (p.source.type === 'local' || (isVendored(p) && ready.has(p.name))))
+      .filter(({ p }) => included(p, 'cursor') && (p.source.type === 'local' || (isVendored(cfg, p) && ready.has(p.name))))
       .map(({ p }) => compact({
         name: p.name,
         source: p.source.type === 'local' ? rel(p.source.path) : `./${VENDOR_DIR}/${p.name}`,
@@ -237,7 +240,7 @@ export async function checkConsistency(cfg: MarketplaceConfig, lock: LockFile, r
       warnings.push(`${p.name}: ${LOCK_FILE} entry does not match the config source yet (run node scripts/update.ts)`);
       continue;
     }
-    if (isVendored(p) && e.commit) {
+    if (isVendored(cfg, p) && e.commit) {
       if (!stampMatches(await readStamp(root, p.name), e)) errors.push(`${p.name}: ${VENDOR_DIR}/${p.name} is missing or not at the locked commit`);
     }
   }
@@ -246,7 +249,7 @@ export async function checkConsistency(cfg: MarketplaceConfig, lock: LockFile, r
     for (const d of await readdir(vendorRoot, { withFileTypes: true })) {
       if (!d.isDirectory()) continue;
       const p = byName.get(d.name);
-      if (!p || !isVendored(p)) errors.push(`${VENDOR_DIR}/${d.name}: not a vendored plugin in the config`);
+      if (!p || !isVendored(cfg, p)) errors.push(`${VENDOR_DIR}/${d.name}: not a vendored plugin in the config`);
     }
   }
   return { errors, warnings };
@@ -259,15 +262,29 @@ export async function loadConfig(configPath: string): Promise<MarketplaceConfig>
   return mod.default;
 }
 
-/** Write each generated file whose bytes changed; returns the relative paths written. */
-export async function writeOutputs(root: string, outputs: Map<string, string>): Promise<string[]> {
+/** True when the file on disk differs from what buildOutputs wants (null: it should not exist). */
+async function isStale(file: string, content: string | null): Promise<boolean> {
+  if (content === null) return existsSync(file);
+  return !existsSync(file) || (await readFile(file, 'utf8')) !== content;
+}
+
+/**
+ * Write each generated file whose bytes changed, and delete each one that should not exist.
+ * Returns log lines ("wrote <path>" / "removed <path>").
+ */
+export async function writeOutputs(root: string, outputs: Map<string, string | null>): Promise<string[]> {
   const written: string[] = [];
   for (const [relPath, content] of outputs) {
     const file = path.join(root, relPath);
-    if (existsSync(file) && (await readFile(file, 'utf8')) === content) continue;
+    if (!(await isStale(file, content))) continue;
+    if (content === null) {
+      await rm(file);
+      written.push(`removed ${relPath}`);
+      continue;
+    }
     await mkdir(path.dirname(file), { recursive: true });
     await writeFile(file, content);
-    written.push(relPath);
+    written.push(`wrote ${relPath}`);
   }
   return written;
 }
@@ -295,7 +312,7 @@ async function main(): Promise<void> {
   for (const w of consistency.warnings) console.warn(`warning: ${w}`);
 
   if (!check) {
-    for (const f of await writeOutputs(root, outputs)) console.log(`wrote ${f}`);
+    for (const line of await writeOutputs(root, outputs)) console.log(line);
     for (const e of consistency.errors) console.warn(`warning: ${e}`);
     console.log(`done: ${cfg.plugins.length} plugin(s)`);
     return;
@@ -303,8 +320,7 @@ async function main(): Promise<void> {
 
   const stale: string[] = [];
   for (const [relPath, content] of outputs) {
-    const file = path.join(root, relPath);
-    if (!existsSync(file) || (await readFile(file, 'utf8')) !== content) stale.push(relPath);
+    if (await isStale(path.join(root, relPath), content)) stale.push(content === null ? `${relPath} (should not exist)` : relPath);
   }
   for (const e of consistency.errors) console.error(`error: ${e}`);
   if (stale.length) console.error(`stale generated files (run: node scripts/build.ts):\n  ${stale.join('\n  ')}`);
