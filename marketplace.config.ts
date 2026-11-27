@@ -13,6 +13,14 @@ export default defineMarketplace({
   // and the vendor/ copies it needs; the next update run fills them in.
   cursor: false,
   plugins: [
+    {
+      name: 'custom-compaction',
+      description:
+        "Replaces Claude Code's built-in compaction with a configurable summarizer (the session's model or any OpenAI/Anthropic-format endpoint).",
+      source: { type: 'github', repo: 'rjstone/custom-compaction-plugin', path: 'claude-code/custom-compaction' },
+      // A Claude Code mod (function-hook plugin): Codex can't run it.
+      exclude: ['codex'],
+    },
     // Plugins are listed at their latest semver release tag (vX.Y.Z or X.Y.Z), resolved
     // automatically into plugins.lock.json by scripts/update.ts. Do not pin by hand.
     //

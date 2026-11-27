@@ -6,5 +6,17 @@
   "metadata": {
     "description": "Pointer-only plugin marketplace: every entry's source lives in another repo."
   },
-  "plugins": []
+  "plugins": [
+    {
+      "name": "custom-compaction",
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/rjstone/custom-compaction-plugin.git",
+        "path": "claude-code/custom-compaction",
+        "ref": "v0.6.0",
+        "sha": "f76ffb3f5bbe6a390bf76bab8dc376e0431d575d"
+      },
+      "description": "Replaces Claude Code's built-in compaction with a configurable summarizer (the session's model or any OpenAI/Anthropic-format endpoint)."
+    }
+  ]
 }

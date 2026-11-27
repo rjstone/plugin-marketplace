@@ -1,3 +1,11 @@
 {
-  "plugins": {}
+  "plugins": {
+    "custom-compaction": {
+      "url": "https://github.com/rjstone/custom-compaction-plugin.git",
+      "path": "claude-code/custom-compaction",
+      "tag": "v0.6.0",
+      "commit": "f76ffb3f5bbe6a390bf76bab8dc376e0431d575d",
+      "override": false
+    }
+  }
 }
