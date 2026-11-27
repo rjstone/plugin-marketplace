@@ -9,8 +9,8 @@
     },
     "github-ninja": {
       "url": "https://github.com/rjstone/github-ninja-plugin.git",
-      "tag": "v0.1.0",
-      "commit": "adbc6ef0c12c4a05797bb5734fa711bbb668b23d",
+      "tag": "v0.2.0",
+      "commit": "a56069451d14073fd4dbe9541820e881187b7c1a",
       "override": false
     }
   }
