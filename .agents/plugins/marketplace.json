@@ -3,5 +3,19 @@
   "interface": {
     "displayName": "rjstone plugins"
   },
-  "plugins": []
+  "plugins": [
+    {
+      "name": "github-ninja",
+      "source": {
+        "source": "url",
+        "url": "https://github.com/rjstone/github-ninja-plugin.git",
+        "sha": "adbc6ef0c12c4a05797bb5734fa711bbb668b23d"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
 }

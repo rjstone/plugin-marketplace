@@ -21,6 +21,13 @@ export default defineMarketplace({
       // A Claude Code mod (function-hook plugin): Codex can't run it.
       exclude: ['codex'],
     },
+    {
+      name: 'github-ninja',
+      description:
+        'GitHub know-how for coding agents: the gh CLI and API, issues, commits and rebases, CI failure diagnosis, GitHub Actions hardening and efficiency, repo security audits, Dependabot, secret scanning, CodeQL and more.',
+      // Skills only (repo root is the plugin), so every harness that reads skills can use it.
+      source: { type: 'github', repo: 'rjstone/github-ninja-plugin' },
+    },
     // Plugins are listed at their latest semver release tag (vX.Y.Z or X.Y.Z), resolved
     // automatically into plugins.lock.json by scripts/update.ts. Do not pin by hand.
     //

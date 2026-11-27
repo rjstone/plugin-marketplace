@@ -17,6 +17,16 @@
         "sha": "12e931b6c85cd3d0c9688669e03f82b0788a5918"
       },
       "description": "Replaces Claude Code's built-in compaction with a configurable summarizer (the session's model or any OpenAI/Anthropic-format endpoint)."
+    },
+    {
+      "name": "github-ninja",
+      "source": {
+        "source": "github",
+        "repo": "rjstone/github-ninja-plugin",
+        "ref": "v0.1.0",
+        "sha": "adbc6ef0c12c4a05797bb5734fa711bbb668b23d"
+      },
+      "description": "GitHub know-how for coding agents: the gh CLI and API, issues, commits and rebases, CI failure diagnosis, GitHub Actions hardening and efficiency, repo security audits, Dependabot, secret scanning, CodeQL and more."
     }
   ]
 }

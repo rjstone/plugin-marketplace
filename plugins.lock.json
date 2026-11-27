@@ -6,6 +6,12 @@
       "tag": "v0.7.0",
       "commit": "12e931b6c85cd3d0c9688669e03f82b0788a5918",
       "override": false
+    },
+    "github-ninja": {
+      "url": "https://github.com/rjstone/github-ninja-plugin.git",
+      "tag": "v0.1.0",
+      "commit": "adbc6ef0c12c4a05797bb5734fa711bbb668b23d",
+      "override": false
     }
   }
 }
