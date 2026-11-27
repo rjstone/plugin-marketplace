@@ -13,8 +13,8 @@
         "source": "git-subdir",
         "url": "https://github.com/rjstone/custom-compaction-plugin.git",
         "path": "claude-code/custom-compaction",
-        "ref": "v0.6.0",
-        "sha": "f76ffb3f5bbe6a390bf76bab8dc376e0431d575d"
+        "ref": "v0.7.0",
+        "sha": "12e931b6c85cd3d0c9688669e03f82b0788a5918"
       },
       "description": "Replaces Claude Code's built-in compaction with a configurable summarizer (the session's model or any OpenAI/Anthropic-format endpoint)."
     }
