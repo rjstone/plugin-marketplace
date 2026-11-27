@@ -1,18 +1,30 @@
 # Copy into a plugin repo as .github/workflows/notify-marketplace.yml.
 #
-# When a release tag (vX.Y.Z or X.Y.Z) is pushed, this starts the marketplace's update workflow
-# so the new release is listed within minutes instead of at the next daily run. It cannot change
+# Starts the marketplace's update workflow so a new release is listed within minutes instead of
+# at the next daily run: on a release tag push (vX.Y.Z or X.Y.Z), or by hand (Actions >
+# notify-marketplace > Run workflow) for a tag pushed before this workflow existed. The marketplace
+# resolves the latest release tag itself; the tag sent here only labels its run. It cannot change
 # the marketplace: the GitHub App it uses needs only "Actions: Read and write" on the marketplace
 # repo (no Contents permission).
 #
 # Setup in THIS plugin repo (Settings -> Secrets and variables -> Actions):
-#   - variable MARKETPLACE_APP_ID: the GitHub App's ID
+#   - variable MARKETPLACE_APP_CLIENT_ID: the GitHub App's Client ID (App settings page, "Iv...")
 #   - secret   MARKETPLACE_APP_PRIVATE_KEY: a private key (.pem) generated for that App
 # Then edit MARKETPLACE_OWNER / MARKETPLACE_REPO below.
+# Actions are pinned to commit SHAs (the version is in the comment).
 name: notify-marketplace
 on:
   push:
     tags: ['v*.*.*', '[0-9]*.[0-9]*.[0-9]*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to report (empty = the latest vX.Y.Z tag)
+        required: false
+        type: string
+
+permissions:
+  contents: read
 
 env:
   MARKETPLACE_OWNER: rjstone
@@ -22,18 +34,43 @@ jobs:
   notify:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/create-github-app-token@v2
+      - name: Find the tag
+        id: tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+          INPUT_TAG: ${{ inputs.tag }}
+          REPO: ${{ github.repository }}
+        run: |
+          if [ "$EVENT" = push ]; then
+            tag="$REF_NAME"
+          elif [ -n "$INPUT_TAG" ]; then
+            tag="$INPUT_TAG"
+          else
+            tag=$(gh api "repos/$REPO/tags" --paginate --jq '.[].name' \
+              | grep -E '^v?[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1)
+          fi
+          # Only a plain release tag goes on (no shell or output injection through a tag name).
+          if ! printf '%s' "$tag" | grep -Eqx 'v?[0-9]+\.[0-9]+\.[0-9]+'; then
+            echo "not a release tag: '$tag'"; exit 1
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "reporting $tag"
+      - uses: actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc # v3.4.0
         id: token
         with:
-          app-id: ${{ vars.MARKETPLACE_APP_ID }}
+          client-id: ${{ vars.MARKETPLACE_APP_CLIENT_ID }}
           private-key: ${{ secrets.MARKETPLACE_APP_PRIVATE_KEY }}
           owner: ${{ env.MARKETPLACE_OWNER }}
           repositories: ${{ env.MARKETPLACE_REPO }}
       - name: Start the marketplace update workflow
         env:
           GH_TOKEN: ${{ steps.token.outputs.token }}
+          REPO: ${{ github.repository }}
+          TAG: ${{ steps.tag.outputs.tag }}
         run: |
           gh api -X POST "repos/$MARKETPLACE_OWNER/$MARKETPLACE_REPO/actions/workflows/update.yml/dispatches" \
             -f ref=main \
-            -f "inputs[repo]=${{ github.repository }}" \
-            -f "inputs[tag]=${{ github.ref_name }}"
+            -f "inputs[repo]=$REPO" \
+            -f "inputs[tag]=$TAG"

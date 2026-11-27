@@ -467,11 +467,13 @@ Without this, new releases are picked up by the daily run.
    - That permission lets the App only *start* workflows here. It can't change any code.
    - The App's client secret isn't used.
 2. In each plugin repo, add:
-   - the variable `MARKETPLACE_APP_ID` (the App's ID)
+   - the variable `MARKETPLACE_APP_CLIENT_ID` (the App's **Client ID**, on its settings page, usually
+     `Iv...`; `actions/create-github-app-token` v3 deprecates the numeric App ID)
    - the secret `MARKETPLACE_APP_PRIVATE_KEY` (a private key `.pem` generated for the App)
 3. Copy `docs/plugin-repo-release-workflow.yml` into the plugin repo as
    `.github/workflows/notify-marketplace.yml`, and set its `MARKETPLACE_OWNER` /
-   `MARKETPLACE_REPO`.
+   `MARKETPLACE_REPO`. It can also be run by hand (Actions > notify-marketplace > Run workflow) for a
+   tag pushed before it was added.
 
 ## Adding a plugin
 
