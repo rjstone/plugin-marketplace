@@ -15,8 +15,8 @@
     },
     "github-ninja": {
       "url": "https://github.com/rjstone/github-ninja-plugin.git",
-      "tag": "v0.2.0",
-      "commit": "a56069451d14073fd4dbe9541820e881187b7c1a",
+      "tag": "v0.3.0",
+      "commit": "b84001a70f7060eb9e1e99927e39e12847f3b9e5",
       "override": false
     },
     "opencode-dev-plugin": {

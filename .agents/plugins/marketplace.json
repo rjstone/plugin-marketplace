@@ -9,7 +9,7 @@
       "source": {
         "source": "url",
         "url": "https://github.com/rjstone/github-ninja-plugin.git",
-        "sha": "a56069451d14073fd4dbe9541820e881187b7c1a"
+        "sha": "b84001a70f7060eb9e1e99927e39e12847f3b9e5"
       },
       "policy": {
         "installation": "AVAILABLE",

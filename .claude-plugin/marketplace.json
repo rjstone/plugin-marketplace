@@ -23,8 +23,8 @@
       "source": {
         "source": "github",
         "repo": "rjstone/github-ninja-plugin",
-        "ref": "v0.2.0",
-        "sha": "a56069451d14073fd4dbe9541820e881187b7c1a"
+        "ref": "v0.3.0",
+        "sha": "b84001a70f7060eb9e1e99927e39e12847f3b9e5"
       },
       "description": "GitHub know-how for coding agents: the gh CLI and API, issues, commits and rebases, CI failure diagnosis, GitHub Actions hardening and efficiency, repo security audits, Dependabot, secret scanning, CodeQL and more."
     },
