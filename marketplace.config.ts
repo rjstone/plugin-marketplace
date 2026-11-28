@@ -28,6 +28,14 @@ export default defineMarketplace({
       // Skills only (repo root is the plugin), so every harness that reads skills can use it.
       source: { type: 'github', repo: 'rjstone/github-ninja-plugin' },
     },
+    {
+      name: 'docshelf-plugin',
+      description:
+        'Offline, version-pinned documentation for coding agents: search and read DevDocs documentation and Dash/Zeal docsets with your own notes (CLI or MCP server), and build trimmed docvols from Sphinx, Doxygen and llms.txt sites.',
+      // Skills plus docshelf's MCP server (python3); the repo root is the plugin.
+      source: { type: 'github', repo: 'rjstone/docshelf-plugin' },
+      pi: true,
+    },
     // Plugins are listed at their latest semver release tag (vX.Y.Z or X.Y.Z), resolved
     // automatically into plugins.lock.json by scripts/update.ts. Do not pin by hand.
     //

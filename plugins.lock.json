@@ -7,6 +7,12 @@
       "commit": "12e931b6c85cd3d0c9688669e03f82b0788a5918",
       "override": false
     },
+    "docshelf-plugin": {
+      "url": "https://github.com/rjstone/docshelf-plugin.git",
+      "tag": "v0.1.0",
+      "commit": "5644c36c5382cb0b351f1b4d4414bab46f4ca512",
+      "override": false
+    },
     "github-ninja": {
       "url": "https://github.com/rjstone/github-ninja-plugin.git",
       "tag": "v0.2.0",

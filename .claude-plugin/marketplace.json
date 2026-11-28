@@ -27,6 +27,16 @@
         "sha": "a56069451d14073fd4dbe9541820e881187b7c1a"
       },
       "description": "GitHub know-how for coding agents: the gh CLI and API, issues, commits and rebases, CI failure diagnosis, GitHub Actions hardening and efficiency, repo security audits, Dependabot, secret scanning, CodeQL and more."
+    },
+    {
+      "name": "docshelf-plugin",
+      "source": {
+        "source": "github",
+        "repo": "rjstone/docshelf-plugin",
+        "ref": "v0.1.0",
+        "sha": "5644c36c5382cb0b351f1b4d4414bab46f4ca512"
+      },
+      "description": "Offline, version-pinned documentation for coding agents: search and read DevDocs documentation and Dash/Zeal docsets with your own notes (CLI or MCP server), and build trimmed docvols from Sphinx, Doxygen and llms.txt sites."
     }
   ]
 }

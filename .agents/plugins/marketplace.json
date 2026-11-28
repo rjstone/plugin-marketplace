@@ -16,6 +16,19 @@
         "authentication": "ON_INSTALL"
       },
       "category": "Productivity"
+    },
+    {
+      "name": "docshelf-plugin",
+      "source": {
+        "source": "url",
+        "url": "https://github.com/rjstone/docshelf-plugin.git",
+        "sha": "5644c36c5382cb0b351f1b4d4414bab46f4ca512"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
     }
   ]
 }

@@ -1,3 +1,5 @@
 {
-  "packages": []
+  "packages": [
+    "git:github.com/rjstone/docshelf-plugin@v0.1.0"
+  ]
 }
