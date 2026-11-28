@@ -29,6 +29,19 @@
         "authentication": "ON_INSTALL"
       },
       "category": "Productivity"
+    },
+    {
+      "name": "opencode-dev-plugin",
+      "source": {
+        "source": "url",
+        "url": "https://github.com/rjstone/opencode-dev-plugin.git",
+        "sha": "94b471055938edd66dceda0ff81d00a6f6566f1d"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
     }
   ]
 }

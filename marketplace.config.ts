@@ -36,6 +36,14 @@ export default defineMarketplace({
       source: { type: 'github', repo: 'rjstone/docshelf-plugin' },
       pi: true,
     },
+    {
+      name: 'opencode-dev-plugin',
+      description:
+        'Skills for developing with opencode v2: writing plugins (@opencode/plugin, SDK, client), the CLI and TUI, the server HTTP API (OpenAPI lookup), and OpenCode Console administration and inference.',
+      // Skills only; the repo root is the plugin.
+      source: { type: 'github', repo: 'rjstone/opencode-dev-plugin' },
+      pi: true,
+    },
     // Plugins are listed at their latest semver release tag (vX.Y.Z or X.Y.Z), resolved
     // automatically into plugins.lock.json by scripts/update.ts. Do not pin by hand.
     //

@@ -37,6 +37,16 @@
         "sha": "5644c36c5382cb0b351f1b4d4414bab46f4ca512"
       },
       "description": "Offline, version-pinned documentation for coding agents: search and read DevDocs documentation and Dash/Zeal docsets with your own notes (CLI or MCP server), and build trimmed docvols from Sphinx, Doxygen and llms.txt sites."
+    },
+    {
+      "name": "opencode-dev-plugin",
+      "source": {
+        "source": "github",
+        "repo": "rjstone/opencode-dev-plugin",
+        "ref": "v0.1.1",
+        "sha": "94b471055938edd66dceda0ff81d00a6f6566f1d"
+      },
+      "description": "Skills for developing with opencode v2: writing plugins (@opencode/plugin, SDK, client), the CLI and TUI, the server HTTP API (OpenAPI lookup), and OpenCode Console administration and inference."
     }
   ]
 }

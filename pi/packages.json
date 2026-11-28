@@ -1,5 +1,6 @@
 {
   "packages": [
-    "git:github.com/rjstone/docshelf-plugin@v0.1.0"
+    "git:github.com/rjstone/docshelf-plugin@v0.1.0",
+    "git:github.com/rjstone/opencode-dev-plugin@v0.1.1"
   ]
 }

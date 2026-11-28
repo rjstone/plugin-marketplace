@@ -18,6 +18,12 @@
       "tag": "v0.2.0",
       "commit": "a56069451d14073fd4dbe9541820e881187b7c1a",
       "override": false
+    },
+    "opencode-dev-plugin": {
+      "url": "https://github.com/rjstone/opencode-dev-plugin.git",
+      "tag": "v0.1.1",
+      "commit": "94b471055938edd66dceda0ff81d00a6f6566f1d",
+      "override": false
     }
   }
 }
